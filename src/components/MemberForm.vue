@@ -36,14 +36,16 @@ const emit = defineEmits(['add','update','remove'])
           </button>
 
           <button
-            class="h-14 text-lg font-bold border-2 rounded-lg flex items-center justify-center active:scale-95 transition"
-            :class="m.status === '10時参加'
+            class="h-14 text-lg font-bold border-2 rounded-lg flex flex-col items-center justify-center active:scale-95 transition"
+            :class="m.status === '10時以降参加'
               ? 'bg-yellow-400 text-white border-yellow-400'
               : 'bg-white border-gray-300 text-gray-500'"
-            @click="emit('update', m.id, 'status', '10時参加')"
+            @click="emit('update', m.id, 'status', '10時以降参加')"
           >
-            ⏰ 10時参加
+            ⏰ 10時以降参加
+            <span class="text-xs font-normal">対象：小3以下</span>
           </button>
+
 
         </div>
 
