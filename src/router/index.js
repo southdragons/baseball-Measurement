@@ -1,12 +1,22 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
-import HistoryView from '../views/HistoryView.vue'
+import PlayersView from '../views/PlayersView.vue'
+import PlayerAddView from '../views/PlayerAddView.vue'
+import PlayerDetailView from '../views/PlayerDetailView.vue'
+import MeasurementTypesView from '../views/MeasurementTypesView.vue'
+import MeasurementRecordView from '../views/MeasurementRecordView.vue'
+import MeasurementHistoryView from '../views/MeasurementHistoryView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
     { path: '/', component: HomeView },
-    { path: '/history', component: HistoryView },
+    { path: '/players', component: PlayersView },
+    { path: '/players/add', component: PlayerAddView },
+    { path: '/players/:id', component: PlayerDetailView },
+    { path: '/measurements', component: MeasurementTypesView },
+    { path: '/measurements/record', component: MeasurementRecordView },
+    { path: '/measurements/:playerId', component: MeasurementHistoryView },
   ],
 })
 

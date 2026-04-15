@@ -1,154 +1,47 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import DatePicker from '../components/DatePicker.vue'
-import MemberForm from '../components/MemberForm.vue'
-import SubmitBar from '../components/SubmitBar.vue'
-
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbwDO9vI4vece_1h5s-IYPopKXW7c8I7_gNIQzhUf7z6nJrLN2dBlFiabj7ULaLh7HDd/exec'
-
-const userId = ref('')
-const members = ref([{ id: Date.now(), name: '', status: null }])
-const selectedDate = ref(new Date())
-const records = ref([])
-const loading = ref(false)
-const toast = ref('')
-
-/* userId */
-function initUserId() {
-  const saved = localStorage.getItem('userId')
-  if (saved) userId.value = saved
-  else {
-    const id = 'user-' + Math.random().toString(36).substring(2, 10)
-    localStorage.setItem('userId', id)
-    userId.value = id
-  }
-}
-
-/* メンバー */
-function addMember() {
-  members.value.push({ id: Date.now(), name: '', status: null })
-}
-
-function updateMember(id, key, val) {
-  members.value = members.value.map(m =>
-    m.id === id ? { ...m, [key]: val } : m
-  )
-}
-
-function removeMember(id) {
-  if (members.value.length === 1) return
-  members.value = members.value.filter(m => m.id !== id)
-}
-
-/* 日付 */
-function formatDate(d) {
-  return d.toISOString().split('T')[0]
-}
-
-/* 履歴 */
-
-/* 送信 */
-async function submit() {
-  const valid = members.value.filter(m => m.name && m.status)
-
-  if (!valid.length) {
-    toast.value = '入力してください'
-    return
-  }
-
-  loading.value = true
-
-  try {
-    await fetch(GAS_URL, {
-      method: 'POST',
-      body: JSON.stringify({
-        type: 'create',
-        userId: userId.value,
-        date: formatDate(selectedDate.value),
-        members: valid
-      })
-    })
-
-    // 👉 GASはここで成功扱い
-    toast.value = '送信完了'
-
-    members.value = members.value.map(m => ({
-      id: Date.now(),
-      name: m.name,
-      status: null
-    }))
-
-  } catch (e) {
-    console.error(e)
-
-    // 👉 GAS対策（重要）
-    toast.value = '送信完了（通信遅延）'
-  } finally {
-    loading.value = false
-  }
-}
-
-/* 初期化 */
-onMounted(() => {
-  initUserId()
-  loadMembers()
-})
-
-function loadMembers() {
-  const saved = localStorage.getItem('members')
-  if (saved) {
-    members.value = JSON.parse(saved)
-  }
-}
-
-watch(members, (val) => {
-  localStorage.setItem('members', JSON.stringify(val))
-}, { deep: true })
-
 </script>
 
 <template>
-  <div class="max-w-md mx-auto px-3 pb-28">
-
-    <div class="text-xl font-bold mb-3 flex items-center gap-2">
-      ⚾ 出欠連絡
+  <div class="max-w-md mx-auto px-4 py-8">
+    <div class="text-center mb-8">
+      <div class="text-4xl mb-2">⚾</div>
+      <h1 class="text-2xl font-bold">野球管理アプリ</h1>
+      <p class="text-gray-500 text-sm mt-1">サウスドラゴンズ</p>
     </div>
 
-    
+    <div class="flex flex-col gap-4">
+      <router-link to="/players" class="card bg-base-100 shadow-md border border-gray-200 hover:shadow-lg transition">
+        <div class="card-body flex-row items-center gap-4">
+          <div class="text-3xl">👥</div>
+          <div>
+            <div class="font-bold text-lg">選手管理</div>
+            <div class="text-sm text-gray-500">選手の追加・編集・卒団管理</div>
+          </div>
+          <div class="ml-auto text-gray-400">›</div>
+        </div>
+      </router-link>
 
-    <DatePicker
-      :date="selectedDate"
-      @change="d => selectedDate = d"
-    />
+      <router-link to="/measurements" class="card bg-base-100 shadow-md border border-gray-200 hover:shadow-lg transition">
+        <div class="card-body flex-row items-center gap-4">
+          <div class="text-3xl">📏</div>
+          <div>
+            <div class="font-bold text-lg">測定項目管理</div>
+            <div class="text-sm text-gray-500">測定項目の追加・編集・削除</div>
+          </div>
+          <div class="ml-auto text-gray-400">›</div>
+        </div>
+      </router-link>
 
-    <MemberForm
-      :members="members"
-      @add="addMember"
-      @update="updateMember"
-      @remove="removeMember"
-    />
-    <router-link
-      to="/history"
-      class="btn btn-outline w-full mt-4"
-    >
-      📄 履歴を見る
-    </router-link>
-
-    <SubmitBar
-      :loading="loading"
-      @submit="submit"
-    />
-
-    <!-- ★ここ修正 -->
-    <div v-if="toast" class="toast toast-top toast-center z-50">
-      <div class="alert alert-success">
-        <span>{{ toast }}</span>
-      </div>
+      <router-link to="/measurements/record" class="card bg-primary text-white shadow-md hover:shadow-lg transition">
+        <div class="card-body flex-row items-center gap-4">
+          <div class="text-3xl">📝</div>
+          <div>
+            <div class="font-bold text-lg">測定記録入力</div>
+            <div class="text-sm opacity-80">選手の測定データを入力</div>
+          </div>
+          <div class="ml-auto">›</div>
+        </div>
+      </router-link>
     </div>
-
   </div>
 </template>
-
-<style scoped>
-
-</style>
