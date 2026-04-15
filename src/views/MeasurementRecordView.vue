@@ -1,23 +1,24 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const players = ref([])
 const types = ref([])
+const selectedType = ref('')
 const selectedPlayer = ref('')
 const measuredAt = ref('')
-const records = ref([])
+const inputValue = ref('')
 const loading = ref(true)
 const saving = ref(false)
 const toast = ref('')
-
-// 直近履歴
 const recentRecords = ref([])
 const editItem = ref(null)
 const editValue = ref('')
 const showEditModal = ref(false)
+const showOverwriteModal = ref(false)
+const existingRecord = ref(null)
 
 function formatDate(d) {
   const y = d.getFullYear()
@@ -26,6 +27,10 @@ function formatDate(d) {
   return `${y}-${m}-${day}`
 }
 
+const selectedTypeInfo = computed(() => {
+  return types.value.find(t => t.id === selectedType.value)
+})
+
 async function fetchData() {
   loading.value = true
   const [playersRes, typesRes] = await Promise.all([
@@ -33,15 +38,7 @@ async function fetchData() {
     supabase.from('measurement_types').select('*').order('order_index')
   ])
   if (!playersRes.error) players.value = playersRes.data || []
-  if (!typesRes.error) {
-    types.value = typesRes.data || []
-    records.value = typesRes.data.map(t => ({
-      measurement_type_id: t.id,
-      name: t.name,
-      unit: t.unit,
-      value: ''
-    }))
-  }
+  if (!typesRes.error) types.value = typesRes.data || []
   measuredAt.value = formatDate(new Date())
   loading.value = false
 }
@@ -51,37 +48,82 @@ async function fetchRecentRecords() {
     .from('measurements')
     .select('*, players(name, player_code), measurement_types(name, unit)')
     .order('created_at', { ascending: false })
-    .limit(3)
+    .limit(5)
   if (!error) recentRecords.value = data || []
 }
 
 async function save() {
+  if (!selectedType.value) {
+    toast.value = '測定種目を選択してください'
+    setTimeout(() => toast.value = '', 3000)
+    return
+  }
   if (!selectedPlayer.value) {
     toast.value = '選手を選択してください'
     setTimeout(() => toast.value = '', 3000)
     return
   }
-  const valid = records.value.filter(r => r.value !== '' && r.value !== null)
-  if (!valid.length) {
+  if (inputValue.value === '') {
     toast.value = '測定値を入力してください'
     setTimeout(() => toast.value = '', 3000)
     return
   }
+
+  // 既存記録チェック
+  const { data: existing } = await supabase
+    .from('measurements')
+    .select('*')
+    .eq('player_id', selectedPlayer.value)
+    .eq('measurement_type_id', selectedType.value)
+    .eq('measured_at', measuredAt.value)
+    .single()
+
+  if (existing) {
+    existingRecord.value = existing
+    showOverwriteModal.value = true
+    return
+  }
+
+  await insertRecord()
+}
+
+async function insertRecord() {
   saving.value = true
   try {
-    const rows = valid.map(r => ({
+    const { error } = await supabase.from('measurements').insert({
       player_id: selectedPlayer.value,
-      measurement_type_id: r.measurement_type_id,
-      value: parseFloat(r.value),
+      measurement_type_id: selectedType.value,
+      value: parseFloat(inputValue.value),
       measured_at: measuredAt.value
-    }))
-    const { error } = await supabase.from('measurements').insert(rows)
+    })
     if (error) throw error
     toast.value = '保存しました'
-    records.value = records.value.map(r => ({ ...r, value: '' }))
+    setTimeout(() => toast.value = '', 2000)
     selectedPlayer.value = ''
+    inputValue.value = ''
     await fetchRecentRecords()
+  } catch (e) {
+    toast.value = 'エラーが発生しました'
     setTimeout(() => toast.value = '', 3000)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function overwriteRecord() {
+  saving.value = true
+  try {
+    const { error } = await supabase
+      .from('measurements')
+      .update({ value: parseFloat(inputValue.value) })
+      .eq('id', existingRecord.value.id)
+    if (error) throw error
+    toast.value = '上書き保存しました'
+    setTimeout(() => toast.value = '', 2000)
+    selectedPlayer.value = ''
+    inputValue.value = ''
+    showOverwriteModal.value = false
+    await fetchRecentRecords()
   } catch (e) {
     toast.value = 'エラーが発生しました'
     setTimeout(() => toast.value = '', 3000)
@@ -142,8 +184,39 @@ onMounted(async () => {
 
     <div v-else class="flex flex-col gap-4">
 
+      <!-- 測定日 -->
+      <div class="card bg-base-100 shadow border border-gray-200">
+        <div class="card-body py-3">
+          <label class="text-sm font-bold mb-1 block">測定日</label>
+          <input
+            type="date"
+            v-model="measuredAt"
+            class="input w-full border-2 border-gray-400 focus:border-primary"
+          />
+        </div>
+      </div>
+
+      <!-- 測定種目選択 -->
+      <div class="card bg-base-100 shadow border border-gray-200">
+        <div class="card-body py-3">
+          <label class="text-sm font-bold mb-1 block">測定種目</label>
+          <select
+            v-model="selectedType"
+            class="select w-full border-2 border-gray-400 focus:border-primary"
+            @change="selectedPlayer = ''; inputValue = ''"
+          >
+            <option value="">選択してください</option>
+            <option v-for="t in types" :key="t.id" :value="t.id">
+              {{ t.name }}（{{ t.unit }}）
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 選手選択・記録入力 -->
       <div class="card bg-base-100 shadow border border-gray-200">
         <div class="card-body flex flex-col gap-3">
+
           <div>
             <label class="text-sm font-bold mb-1 block">選手</label>
             <select
@@ -156,47 +229,34 @@ onMounted(async () => {
               </option>
             </select>
           </div>
-          <div>
-            <label class="text-sm font-bold mb-1 block">測定日</label>
-            <input
-              type="date"
-              v-model="measuredAt"
-              class="input w-full border-2 border-gray-400 focus:border-primary"
-            />
-          </div>
-        </div>
-      </div>
 
-      <div class="card bg-base-100 shadow border border-gray-200">
-        <div class="card-body">
-          <h2 class="font-bold mb-3">測定値入力</h2>
-          <div v-if="!records.length" class="text-center text-gray-500 py-4">
-            測定項目が登録されていません
-          </div>
-          <div v-for="r in records" :key="r.measurement_type_id" class="flex items-center gap-3 mb-3">
-            <div class="flex-1 font-bold text-sm">{{ r.name }}</div>
+          <div>
+            <label class="text-sm font-bold mb-1 block">
+              測定値
+              <span v-if="selectedTypeInfo" class="text-gray-500 font-normal ml-1">（{{ selectedTypeInfo.unit }}）</span>
+            </label>
             <input
-              v-model="r.value"
+              v-model="inputValue"
               type="number"
               step="0.01"
               placeholder="0.00"
-              class="input input-bordered w-28 text-right"
+              class="input w-full border-2 border-gray-400 focus:border-primary text-right text-lg"
             />
-            <div class="text-sm text-gray-500 w-8">{{ r.unit }}</div>
           </div>
+
+          <button
+            class="btn btn-primary w-full h-14 text-lg"
+            :disabled="saving"
+            @click="save"
+          >
+            <span v-if="saving" class="loading loading-spinner loading-sm"></span>
+            保存して次の選手へ →
+          </button>
+
         </div>
       </div>
 
-      <button
-        class="btn btn-primary w-full h-14 text-lg"
-        :disabled="saving"
-        @click="save"
-      >
-        <span v-if="saving" class="loading loading-spinner loading-sm"></span>
-        保存する
-      </button>
-
-      <!-- 直近3件 -->
+      <!-- 直近5件 -->
       <div v-if="recentRecords.length" class="mt-2">
         <div class="text-sm font-bold text-gray-500 mb-2">📋 直近の入力履歴</div>
         <div
@@ -217,6 +277,20 @@ onMounted(async () => {
         </div>
       </div>
 
+    </div>
+
+    <!-- 上書き確認モーダル -->
+    <div v-if="showOverwriteModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-xl w-72">
+        <h2 class="font-bold text-lg mb-2">⚠️ 記録が既にあります</h2>
+        <p class="text-sm text-gray-500 mb-2">既存の記録：<span class="font-bold text-primary">{{ existingRecord?.value }}</span></p>
+        <p class="text-sm text-gray-500 mb-4">新しい記録：<span class="font-bold text-primary">{{ inputValue }}</span></p>
+        <p class="text-sm text-gray-500 mb-4">上書きしますか？</p>
+        <div class="flex gap-2">
+          <button class="btn btn-outline flex-1" @click="showOverwriteModal = false">キャンセル</button>
+          <button class="btn btn-primary flex-1" @click="overwriteRecord">上書き</button>
+        </div>
+      </div>
     </div>
 
     <!-- 編集モーダル -->
