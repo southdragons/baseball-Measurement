@@ -1,9 +1,10 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { supabase } from '../lib/supabase'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
+const router = useRouter()
 const player = ref(null)
 const siblings = ref([])
 const types = ref([])
@@ -13,7 +14,6 @@ const loading = ref(true)
 async function fetchData() {
   loading.value = true
 
-  // 選手情報取得
   const { data: playerData } = await supabase
     .from('players')
     .select('*')
@@ -21,7 +21,6 @@ async function fetchData() {
     .single()
   player.value = playerData
 
-  // 兄弟情報取得
   const { data: siblingData } = await supabase
     .from('siblings')
     .select('sibling_id')
@@ -37,17 +36,14 @@ async function fetchData() {
     siblings.value = siblingPlayers || []
   }
 
-  // 測定項目取得
   const { data: typesData } = await supabase
     .from('measurement_types')
     .select('*')
     .order('order_index')
   types.value = typesData || []
 
-  // 全対象選手のIDリスト（本人＋兄弟）
   const allIds = [route.params.playerId, ...siblingIds]
 
-  // 測定記録取得
   const { data: measurementsData } = await supabase
     .from('measurements')
     .select('*')
@@ -56,6 +52,15 @@ async function fetchData() {
   measurements.value = measurementsData || []
 
   loading.value = false
+}
+
+function goBack() {
+  const back = window.history.state?.back || ''
+  if (back.includes('/measurements/list')) {
+    router.push('/measurements/list')
+  } else {
+    router.push(`/players/${route.params.playerId}`)
+  }
 }
 
 function groupByDate() {
@@ -86,7 +91,7 @@ onMounted(fetchData)
 <template>
   <div class="max-w-md mx-auto px-4 py-6">
     <div class="flex items-center mb-6 gap-2">
-      <router-link :to="`/players/${route.params.playerId}`" class="btn btn-sm btn-ghost">←</router-link>
+      <button @click="goBack" class="btn btn-sm btn-ghost">←</button>
       <h1 class="text-xl font-bold">📊 測定履歴</h1>
     </div>
 
@@ -95,7 +100,6 @@ onMounted(fetchData)
     </div>
 
     <div v-else>
-      <!-- 選手情報 -->
       <div v-if="player" class="card bg-primary text-white shadow mb-4">
         <div class="card-body py-3 flex-row items-center gap-3">
           <div class="badge badge-outline badge-lg font-mono">{{ player.player_code }}</div>
@@ -106,7 +110,6 @@ onMounted(fetchData)
         </div>
       </div>
 
-      <!-- 兄弟バッジ -->
       <div v-if="siblings.length" class="flex gap-2 mb-4 flex-wrap">
         <div v-for="s in siblings" :key="s.id" class="badge badge-outline gap-1">
           {{ s.player_code }} {{ s.name }}（{{ s.grade }}年）

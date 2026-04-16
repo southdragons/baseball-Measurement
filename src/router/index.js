@@ -6,6 +6,7 @@ import PlayerDetailView from '../views/PlayerDetailView.vue'
 import MeasurementTypesView from '../views/MeasurementTypesView.vue'
 import MeasurementRecordView from '../views/MeasurementRecordView.vue'
 import MeasurementHistoryView from '../views/MeasurementHistoryView.vue'
+import MeasurementListView from '../views/MeasurementListView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -16,6 +17,7 @@ const router = createRouter({
     { path: '/players/:id', component: PlayerDetailView },
     { path: '/measurements', component: MeasurementTypesView },
     { path: '/measurements/record', component: MeasurementRecordView },
+    { path: '/measurements/list', component: MeasurementListView },
     { path: '/measurements/:playerId', component: MeasurementHistoryView },
   ],
 })
