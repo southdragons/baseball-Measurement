@@ -9,6 +9,8 @@ const editItem = ref(null)
 const name = ref('')
 const unit = ref('')
 const toast = ref('')
+const showDeleteError = ref(false)
+const deleteErrorMsg = ref('')
 
 async function fetchTypes() {
   loading.value = true
@@ -68,6 +70,19 @@ async function save() {
 }
 
 async function deleteType(id) {
+  // 測定記録が存在するか確認
+  const { data } = await supabase
+    .from('measurements')
+    .select('id')
+    .eq('measurement_type_id', id)
+    .limit(1)
+
+  if (data && data.length > 0) {
+    deleteErrorMsg.value = 'この測定項目には記録データがあるため削除できません。先に記録データを削除してください。'
+    showDeleteError.value = true
+    return
+  }
+
   const { error } = await supabase
     .from('measurement_types')
     .delete()
@@ -120,7 +135,6 @@ onMounted(fetchTypes)
         <h2 class="font-bold text-lg mb-4">
           {{ editItem ? '項目を編集' : '項目を追加' }}
         </h2>
-
         <div class="flex flex-col gap-3">
           <div>
             <label class="text-sm font-bold mb-1 block">項目名</label>
@@ -139,11 +153,19 @@ onMounted(fetchTypes)
             />
           </div>
         </div>
-
         <div class="flex gap-2 mt-4">
           <button class="btn btn-outline flex-1" @click="showForm = false">キャンセル</button>
           <button class="btn btn-primary flex-1" @click="save">保存</button>
         </div>
+      </div>
+    </div>
+
+    <!-- 削除エラーモーダル -->
+    <div v-if="showDeleteError" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-xl w-72">
+        <h2 class="font-bold text-lg mb-2">⚠️ 削除できません</h2>
+        <p class="text-sm text-gray-500 mb-4">{{ deleteErrorMsg }}</p>
+        <button class="btn btn-primary w-full" @click="showDeleteError = false">閉じる</button>
       </div>
     </div>
 
