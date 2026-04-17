@@ -119,12 +119,36 @@ async function archive() {
   if (!error) router.push('/players')
 }
 
+async function unarchive() {
+  const { error } = await supabase
+    .from('players')
+    .update({ status: 'active' })
+    .eq('id', route.params.id)
+  if (!error) router.push('/players')
+}
+
 async function deletePlayer() {
+  const id = route.params.id
+
+  // 関連データを先に削除
+  await supabase.from('measurements').delete().eq('player_id', id)
+  await supabase.from('siblings').delete().eq('player_id', id)
+  await supabase.from('siblings').delete().eq('sibling_id', id)
+  await supabase.from('at_bats').delete().eq('player_id', id)
+  await supabase.from('steals').delete().eq('player_id', id)
+  await supabase.from('orders').delete().eq('player_id', id)
+
+  // 選手を削除
   const { error } = await supabase
     .from('players')
     .delete()
-    .eq('id', route.params.id)
+    .eq('id', id)
   if (!error) router.push('/players')
+  else {
+    toast.value = '削除できませんでした'
+    setTimeout(() => toast.value = '', 3000)
+    showDeleteConfirm.value = false
+  }
 }
 
 onMounted(async () => {
@@ -224,7 +248,7 @@ onMounted(async () => {
           <button v-if="player.status === 'active'" class="btn btn-outline btn-warning w-full" @click="archive">
             🎓 卒団にする
           </button>
-          <button v-else class="btn btn-outline w-full" @click="save">
+          <button v-else class="btn btn-outline btn-success w-full" @click="unarchive">
             🔄 現役に戻す
           </button>
           <button class="btn btn-outline btn-error w-full" @click="showDeleteConfirm = true">
